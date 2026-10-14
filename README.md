@@ -5,19 +5,18 @@ starts the session command compiled into `config.h`.
 
 ## Build
 
-Install a C11 compiler, Meson 1.1 or later, Ninja, PAM development headers, and
+Install a C11 compiler, Make, PAM development headers, and
 Python 3 with Pillow. Python and Pillow are needed only during the build.
 The screen requires `/dev/fb0` with a true-color display of at least 480 × 500.
 
 ```sh
-meson setup build
-meson compile -C build
-meson test -C build --print-errorlogs
+make
+make check
 ```
 
 ## Configuration
 
-Edit `config.h`, then run `meson compile -C build` again. Settings are compiled
+Edit `config.h`, then run `make` again. Settings are compiled
 into the executable; changing the file does not change an already running process.
 
 | Setting | What to put there |
@@ -76,8 +75,7 @@ Use `0xRRGGBB` values in `config.h`.
 Choose a PNG, JPEG, or another image format supported by Pillow:
 
 ```sh
-meson configure build -Dimage=/absolute/path/to/image.png
-meson compile -C build
+make IMAGE=/absolute/path/to/image.png
 ```
 
 Relative image paths start at the source directory. The default is
@@ -94,10 +92,14 @@ build/green-login --preview preview.ppm
 ## Install and run
 
 ```sh
-sudo meson install -C build --strip
+sudo make install
 ```
 
-The default install path is `/usr/local/bin/green-login`. Configure your service
+The default install path is `/usr/local/bin/green-login`. Override `PREFIX` to
+change it, or use `DESTDIR` for a staged installation. Run `make clean` to remove
+build output.
+
+Configure your service
 supervisor to run that executable as root on the selected tty. Stop that tty's
 getty first so the two programs do not compete for it. Keep a second tty available
 while testing. The greeter waits until its tty is active before drawing.
