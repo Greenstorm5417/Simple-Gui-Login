@@ -1,0 +1,1 @@
+option('image', type: 'string', value: 'assets/void-logo.png', description: 'Image to embed; relative paths start at the source directory')
