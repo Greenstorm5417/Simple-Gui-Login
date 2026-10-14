@@ -8,7 +8,7 @@
 #include <termios.h>
 
 #define WIDTH 480
-#define HEIGHT 500
+#define HEIGHT 380
 #define SECRET_SIZE 513
 
 struct config {

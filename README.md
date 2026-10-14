@@ -7,7 +7,7 @@ starts the session command compiled into `config.h`.
 
 Install a C11 compiler, Make, PAM development headers, and
 Python 3 with Pillow. Python and Pillow are needed only during the build.
-The screen requires `/dev/fb0` with a true-color display of at least 480 × 500.
+The screen requires `/dev/fb0` with a true-color display of at least 480 × 380.
 
 ```sh
 make

@@ -130,17 +130,17 @@ scanline(struct canvas *c, const struct ui *ui, bool caps)
 		}
 	}
 	centered(c, config.title, 109, 23, config.text);
-	rect(c, 31, 158, 418, 232, 14, config.border);
-	rect(c, 32, 159, 416, 230, 13, config.card);
-	field(c, 184, "Username", ui->user, ui->focus == 0);
+	rect(c, 31, 140, 418, 184, 14, config.border);
+	rect(c, 32, 141, 416, 182, 13, config.card);
+	field(c, 166, "Username", ui->user, ui->focus == 0);
 	char masked[28 * 3 + 1] = {0};
 	unsigned count = 0;
 	for (const char *p = ui->password; *p && count < 28; count++) {
 		(void)next_char(&p);
 		memcpy(masked + count * 3, "\xe2\x80\xa2", 3);
 	}
-	field(c, 265, caps ? "Password · Caps Lock" : "Password", masked, ui->focus == 1);
-	centered(c, ui->status, 452, 12, ui->error ? config.error : config.muted);
+	field(c, 247, caps ? "Password · Caps Lock" : "Password", masked, ui->focus == 1);
+	centered(c, ui->status, 356, 12, ui->error ? config.error : config.muted);
 }
 
 static uint32_t
@@ -224,12 +224,12 @@ preview(struct ui *ui, const char *path)
 	struct canvas c;
 	unsigned char row[1280 * 3];
 	for (int y = 0; y < 800 && !failed; y++) {
-		c.y = y - 150;
+		c.y = y - (800 - HEIGHT) / 2;
 		if (c.y >= 0 && c.y < HEIGHT)
 			scanline(&c, ui, false);
 		for (int x = 0; x < 1280; x++) {
-			uint32_t color = x >= 400 && x < 880 && c.y >= 0 && c.y < HEIGHT
-			                     ? c.pixels[x - 400]
+			uint32_t color = x >= (1280 - WIDTH) / 2 && x < (1280 + WIDTH) / 2 && c.y >= 0 && c.y < HEIGHT
+			                     ? c.pixels[x - (1280 - WIDTH) / 2]
 			                     : config.background;
 			row[x * 3] = (unsigned char)(color >> 16);
 			row[x * 3 + 1] = (unsigned char)(color >> 8);

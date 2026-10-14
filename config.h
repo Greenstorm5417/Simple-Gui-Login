@@ -1,4 +1,4 @@
-/* Edit these settings, then rebuild with Meson. */
+/* Edit these settings, then rebuild with Make. */
 const struct config config = {
     /* Login defaults and PAM policy. */
     .user = "green",
@@ -9,7 +9,7 @@ const struct config config = {
     /* Executable and arguments; terminate the list with NULL. */
     .session = {"/usr/bin/dbus-run-session", "/home/green/.local/bin/green-session", NULL},
 
-    /* RGB colors. Set the image with Meson's -Dimage option. */
+    /* RGB colors. Set the image with make IMAGE=/path/to/image.png. */
     .background = 0x263238,
     .text = 0xe1e9e2,
     .muted = 0x98a8a5,
