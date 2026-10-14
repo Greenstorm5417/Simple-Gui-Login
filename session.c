@@ -155,6 +155,8 @@ worker(pam_handle_t *pam, struct ui *ui, struct passwd *user, gid_t *groups, int
 				_exit(126);
 		struct sigaction action = {.sa_handler = SIG_DFL};
 		sigemptyset(&action.sa_mask);
+		if (sigprocmask(SIG_SETMASK, &action.sa_mask, NULL))
+			_exit(126);
 		int signals[] = {SIGTERM, SIGINT, SIGHUP, SIGTTOU, SIGTTIN};
 		for (unsigned i = 0; i < sizeof signals / sizeof *signals; i++)
 			if (sigaction(signals[i], &action, NULL))

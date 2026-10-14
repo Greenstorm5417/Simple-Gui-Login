@@ -107,7 +107,7 @@ answer(struct ui *ui, const char *prompt, bool secret, char out[SECRET_SIZE])
 int
 main(int argc, char **argv)
 {
-	struct ui ui = {.tty = -1, .fb = -1, .interactive = true, .focus = 1};
+	struct ui ui = {.tty = -1, .fb = -1, .keyboard_mode = -1, .interactive = true, .focus = 1};
 	const char *tty = config.tty, *image = NULL;
 	int result = EXIT_FAILURE;
 	snprintf(ui.user, sizeof ui.user, "%s", config.user);

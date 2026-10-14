@@ -184,6 +184,8 @@ write_row(struct ui *ui, const void *data, size_t length, unsigned x, unsigned y
 int
 framebuffer_clear(struct ui *ui)
 {
+	if (!ui->active)
+		return 0;
 	unsigned bytes = ui->var.bits_per_pixel / 8;
 	unsigned char row[8192 * 4];
 	for (unsigned x = 0; x < ui->var.xres; x++)
@@ -197,7 +199,7 @@ framebuffer_clear(struct ui *ui)
 int
 draw(struct ui *ui)
 {
-	if (ui->fb < 0)
+	if (ui->fb < 0 || !ui->active)
 		return 0;
 	struct canvas c;
 	unsigned char row[WIDTH * 4], leds = 0;
@@ -228,7 +230,8 @@ preview(struct ui *ui, const char *path)
 		if (c.y >= 0 && c.y < HEIGHT)
 			scanline(&c, ui, false);
 		for (int x = 0; x < 1280; x++) {
-			uint32_t color = x >= (1280 - WIDTH) / 2 && x < (1280 + WIDTH) / 2 && c.y >= 0 && c.y < HEIGHT
+			uint32_t color = x >= (1280 - WIDTH) / 2 && x < (1280 + WIDTH) / 2 &&
+			                         c.y >= 0 && c.y < HEIGHT
 			                     ? c.pixels[x - (1280 - WIDTH) / 2]
 			                     : config.background;
 			row[x * 3] = (unsigned char)(color >> 16);

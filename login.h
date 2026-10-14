@@ -19,8 +19,8 @@ struct config {
 extern const struct config config;
 
 struct ui {
-	int tty, fb, vt;
-	bool graphics, interactive, error;
+	int tty, fb, vt, keyboard_mode;
+	bool graphics, interactive, error, active;
 	struct termios original;
 	struct fb_var_screeninfo var;
 	struct fb_fix_screeninfo fix;

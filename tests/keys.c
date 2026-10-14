@@ -7,6 +7,19 @@
 volatile sig_atomic_t stopping, session_group;
 
 int
+draw(struct ui *ui)
+{
+	(void)ui;
+	return 0;
+}
+int
+framebuffer_clear(struct ui *ui)
+{
+	(void)ui;
+	return 0;
+}
+
+int
 main(void)
 {
 	const struct {

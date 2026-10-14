@@ -8,14 +8,68 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/signalfd.h>
 #include <unistd.h>
+
+static int vt_events = -1;
+static struct ui *vt_ui;
+
+static int
+terminal_events(void)
+{
+	struct signalfd_siginfo event;
+	if (read(vt_events, &event, sizeof event) != sizeof event)
+		return -1;
+	if (event.ssi_signo == SIGUSR1) {
+		vt_ui->active = false;
+		return ioctl(vt_ui->tty, VT_RELDISP, 1);
+	}
+	if (ioctl(vt_ui->tty, VT_RELDISP, VT_ACKACQ) < 0)
+		return -1;
+	vt_ui->active = true;
+	if (framebuffer_clear(vt_ui) < 0)
+		return -1;
+	return draw(vt_ui);
+}
+
+static int
+terminal_unwatch(struct ui *ui)
+{
+	struct vt_mode mode = {.mode = VT_AUTO};
+	if (ioctl(ui->tty, VT_SETMODE, &mode) < 0)
+		return -1;
+	if (vt_events >= 0) {
+		close(vt_events);
+		vt_events = -1;
+	}
+	vt_ui = NULL;
+	return 0;
+}
 
 int
 terminal_raw(struct ui *ui)
 {
+	sigset_t mask;
+	sigemptyset(&mask);
+	sigaddset(&mask, SIGUSR1);
+	sigaddset(&mask, SIGUSR2);
+	if (sigprocmask(SIG_BLOCK, &mask, NULL) < 0)
+		return -1;
+	vt_events = signalfd(-1, &mask, SFD_CLOEXEC | SFD_NONBLOCK);
+	if (vt_events < 0)
+		return -1;
+	vt_ui = ui;
+	struct vt_mode mode = {.mode = VT_PROCESS, .relsig = SIGUSR1, .acqsig = SIGUSR2};
+	if (ioctl(ui->tty, VT_SETMODE, &mode) < 0)
+		return -1;
+	while (ioctl(ui->tty, VT_WAITACTIVE, ui->vt) < 0) {
+		if (errno != EINTR || stopping)
+			return -1;
+	}
+	ui->active = true;
 	struct termios raw = ui->original;
 	cfmakeraw(&raw);
-	if (tcsetattr(ui->tty, TCSANOW, &raw) < 0)
+	if (ioctl(ui->tty, KDSKBMODE, K_UNICODE) < 0 || tcsetattr(ui->tty, TCSANOW, &raw) < 0)
 		return -1;
 	if (ioctl(ui->tty, KDSETMODE, KD_GRAPHICS) < 0)
 		return -1;
@@ -28,10 +82,20 @@ terminal_restore(struct ui *ui)
 {
 	if (ui->tty < 0)
 		return;
+	char path[32];
+	snprintf(path, sizeof path, "/dev/tty%d", ui->vt);
+	int fd = open(path, O_RDWR | O_NOCTTY | O_CLOEXEC);
+	if (fd >= 0) {
+		close(ui->tty);
+		ui->tty = fd;
+	}
+	(void)terminal_unwatch(ui);
 	if (ui->graphics) {
 		if (ioctl(ui->tty, KDSETMODE, KD_TEXT) == 0)
 			ui->graphics = false;
 	}
+	if (ui->keyboard_mode >= 0)
+		(void)ioctl(ui->tty, KDSKBMODE, ui->keyboard_mode);
 	(void)tcsetattr(ui->tty, TCSANOW, &ui->original);
 }
 
@@ -52,7 +116,8 @@ terminal_open(struct ui *ui, const char *path)
 	ui->tty = open(path, O_RDWR | O_NOCTTY | O_CLOEXEC);
 	if (ui->tty < 0)
 		return -1;
-	if (tcgetattr(ui->tty, &ui->original) < 0) {
+	if (tcgetattr(ui->tty, &ui->original) < 0 ||
+	    ioctl(ui->tty, KDGKBMODE, &ui->keyboard_mode) < 0) {
 		close(ui->tty);
 		ui->tty = -1;
 		return -1;
@@ -72,6 +137,8 @@ terminal_open(struct ui *ui, const char *path)
 int
 terminal_detach(struct ui *ui)
 {
+	if (terminal_unwatch(ui) < 0 || ioctl(ui->tty, KDSKBMODE, ui->keyboard_mode) < 0)
+		return -1;
 	struct sigaction ignore = {.sa_handler = SIG_IGN}, previous;
 	sigemptyset(&ignore.sa_mask);
 	if (sigaction(SIGHUP, &ignore, &previous) < 0)
@@ -102,16 +169,27 @@ terminal_reclaim(struct ui *ui)
 static int
 byte(int fd, int timeout)
 {
-	struct pollfd p = {.fd = fd, .events = POLLIN};
+	struct pollfd p[2] = {{.fd = fd, .events = POLLIN}, {.fd = vt_events, .events = POLLIN}};
 	unsigned char ch;
-	int n = poll(&p, 1, timeout);
-	if (!n)
-		return KEY_IGNORE;
-	if (n < 0)
-		return -1;
-	if (read(fd, &ch, 1) != 1) {
-		errno = EIO;
-		return -1;
+	for (;;) {
+		p[0].fd = vt_ui && !vt_ui->active ? -1 : fd;
+		int n = poll(p, 2, timeout);
+		if (!n)
+			return KEY_IGNORE;
+		if (n < 0)
+			return -1;
+		if (p[1].revents & POLLIN) {
+			if (terminal_events() < 0)
+				return -1;
+			continue;
+		}
+		if (vt_ui && !vt_ui->active)
+			continue;
+		if (read(fd, &ch, 1) != 1) {
+			errno = EIO;
+			return -1;
+		}
+		break;
 	}
 	return ch;
 }
