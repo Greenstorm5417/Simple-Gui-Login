@@ -1,4 +1,3 @@
-/* Generated from the bundled Noto font; SIL license: FONT-LICENSE.txt. */
 struct glyph { float advance; int xmin, ymin; unsigned width, height, offset; };
 static const struct glyph glyphs[] = {
     {3.1200001, 0, 0, 0, 0, 0},

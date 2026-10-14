@@ -14,3 +14,6 @@ logo = custom_target('logo', input: image, output: 'logo.h',
   command: [python, files('tools/embed-image.py'), '@INPUT@', '@OUTPUT@'])
 executable('green-login', ['main.c', 'platform.c', 'draw.c', 'session.c', logo],
   dependencies: cc.find_library('pam'), install: true)
+keys = executable('check-keys', ['tests/keys.c', 'platform.c'],
+  include_directories: include_directories('.'), install: false)
+test('keys', keys)
