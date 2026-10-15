@@ -174,5 +174,67 @@ For package details, see Arch's [PAM](https://archlinux.org/packages/core/x86_64
 and [Pillow](https://archlinux.org/packages/extra/x86_64/python-pillow/) packages,
 and the [systemd service manual](https://man.archlinux.org/man/systemd.service.5.en).
 
+## Artix Linux / OpenRC setup
+
+These instructions assume Artix is already running OpenRC. Install dependencies:
+
+```sh
+sudo pacman -Syu --needed base-devel git pam python-pillow dbus-openrc elogind-openrc
+```
+
+Clone the repository and edit `config.h` as described above, then run `make`,
+`make check`, and `sudo make install`. Keep the `login` PAM policy and make sure
+it includes `pam_elogind.so` through Artix's existing session configuration;
+the greeter requires `/run/user/<uid>` to be created for the logged-in user.
+Check that `/dev/fb0` exists.
+
+Create `/etc/init.d/green-login`:
+
+```sh
+#!/sbin/openrc-run
+
+command="/usr/local/bin/green-login"
+command_args="--tty /dev/tty1"
+command_background=true
+pidfile="/run/${RC_SVCNAME}.pid"
+
+depend() {
+    need dbus elogind
+    after bootmisc
+}
+```
+
+Disable any existing display manager first. Switch to tty2 with Ctrl+Alt+F2
+and log in there. The commands below assume the normal tty1 login is the
+`agetty.tty1` service in the `default` runlevel; check `rc-update show` and use
+its actual runlevel if different.
+
+```sh
+sudo chmod 755 /etc/init.d/green-login
+sudo rc-update add dbus default
+sudo rc-update add elogind default
+sudo rc-update del agetty.tty1 default
+sudo rc-service agetty.tty1 stop
+sudo rc-update add green-login default
+sudo rc-service green-login start
+```
+
+Switch to tty1 with Ctrl+Alt+F1. To restore the normal login, run from tty2:
+
+```sh
+sudo rc-service green-login stop
+sudo rc-update del green-login default
+sudo rc-update add agetty.tty1 default
+sudo rc-service agetty.tty1 start
+```
+
+If your system starts tty1 through `/etc/inittab`, disable that tty1 getty entry
+instead of using the `agetty.tty1` commands, and restore the entry when reverting.
+Keep tty2 enabled. Other OpenRC distributions can use the same service script,
+with their own dependency packages and PAM session configuration.
+
+See OpenRC's [service script guide](https://github.com/OpenRC/openrc/blob/master/service-script-guide.md)
+and [agetty guide](https://github.com/OpenRC/openrc/blob/master/agetty-guide.md).
+
 The C code is MIT licensed. The bundled font has its own license in
 `assets/FONT-LICENSE.txt`.
