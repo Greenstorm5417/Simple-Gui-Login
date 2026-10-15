@@ -1,6 +1,7 @@
 #include "login.h"
 #include <errno.h>
 #include <grp.h>
+#include <limits.h>
 #include <pwd.h>
 #include <security/pam_appl.h>
 #include <stdio.h>
@@ -88,12 +89,31 @@ wait_child(pid_t child, int *status)
 static int
 session_environment(pam_handle_t *pam, const struct passwd *user)
 {
-	char runtime[64];
-	snprintf(runtime, sizeof runtime, "/run/user/%lu", (unsigned long)user->pw_uid);
+	char runtime[PATH_MAX];
+	const char *directory = pam_getenv(pam, "XDG_RUNTIME_DIR");
+	if (directory) {
+		if (directory[0] != '/' ||
+		    snprintf(runtime, sizeof runtime, "%s", directory) >= (int)sizeof runtime) {
+			errno = EINVAL;
+			return -1;
+		}
+	} else {
+		snprintf(runtime, sizeof runtime, "/run/user/%lu", (unsigned long)user->pw_uid);
+	}
 	struct stat info;
-	if (lstat(runtime, &info) < 0 || !S_ISDIR(info.st_mode) || info.st_uid != user->pw_uid ||
-	    (info.st_mode & 0777) != 0700)
+	if (lstat(runtime, &info) < 0) {
+		fprintf(stderr, "green-login: runtime directory %s: %s; check PAM session setup\n",
+		        runtime, strerror(errno));
 		return -1;
+	}
+	if (!S_ISDIR(info.st_mode) || info.st_uid != user->pw_uid ||
+	    (info.st_mode & 0777) != 0700) {
+		fprintf(stderr,
+		        "green-login: runtime directory %s needs user ownership and mode 0700\n",
+		        runtime);
+		errno = EPERM;
+		return -1;
+	}
 	char **environment = pam_getenvlist(pam);
 	if (clearenv())
 		return -1;
@@ -123,8 +143,10 @@ worker(pam_handle_t *pam, struct ui *ui, struct passwd *user, gid_t *groups, int
 {
 	int status = PAM_SYSTEM_ERR, child_status = 0;
 	bool credentials = false, opened = false;
-	if (setsid() < 0 || ioctl(ui->tty, TIOCSCTTY, 0) < 0)
+	if (setsid() < 0 || terminal_reclaim(ui) < 0) {
+		fprintf(stderr, "green-login: session TTY: %s\n", strerror(errno));
 		goto done;
+	}
 	char vt[32], type[64];
 	if (snprintf(type, sizeof type, "XDG_SESSION_TYPE=%s", config.session_type) >=
 	    (int)sizeof type)
@@ -148,9 +170,12 @@ worker(pam_handle_t *pam, struct ui *ui, struct passwd *user, gid_t *groups, int
 		if (setpgid(0, 0) || session_environment(pam, user) ||
 		    setgroups((size_t)group_count, groups) ||
 		    setresgid(user->pw_gid, user->pw_gid, user->pw_gid) ||
-		    setresuid(user->pw_uid, user->pw_uid, user->pw_uid) || chdir(user->pw_dir))
+		    setresuid(user->pw_uid, user->pw_uid, user->pw_uid) || chdir(user->pw_dir)) {
+			fprintf(stderr, "green-login: session environment or identity: %s\n",
+			        strerror(errno));
 			_exit(126);
-		for (int fd = 0; fd < 3; fd++)
+		}
+		for (int fd = 0; fd < 2; fd++)
 			if (dup2(ui->tty, fd) < 0)
 				_exit(126);
 		struct sigaction action = {.sa_handler = SIG_DFL};
@@ -164,6 +189,7 @@ worker(pam_handle_t *pam, struct ui *ui, struct passwd *user, gid_t *groups, int
 		if (close_range(3, ~0u, 0))
 			_exit(126);
 		execv(config.session[0], config.session);
+		fprintf(stderr, "green-login: exec %s: %s\n", config.session[0], strerror(errno));
 		_exit(127);
 	}
 	session_group = child;
@@ -175,8 +201,8 @@ worker(pam_handle_t *pam, struct ui *ui, struct passwd *user, gid_t *groups, int
 	session_group = 0;
 done:
 	if (status != PAM_SUCCESS && !stopping)
-		fprintf(stderr, "green-login: session ended (PAM %d, child %d)\n", status,
-		        child_status);
+		fprintf(stderr, "green-login: session ended: %s (child status %d)\n",
+		        pam_strerror(pam, status), child_status);
 	if (opened)
 		(void)pam_close_session(pam, 0);
 	if (credentials)
@@ -251,10 +277,10 @@ login_session(struct ui *ui)
 	if (!waited && WIFEXITED(child_status) && !WEXITSTATUS(child_status))
 		return 0;
 	errno = EIO;
-	return -1;
+	return 1;
 fail:
 	free(groups);
 	(void)pam_end(pam, PAM_SYSTEM_ERR);
 	errno = EACCES;
-	return -1;
+	return 1;
 }

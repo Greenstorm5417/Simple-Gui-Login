@@ -197,6 +197,8 @@ command="/usr/local/bin/green-login"
 command_args="--tty /dev/tty1"
 command_background=true
 pidfile="/run/${RC_SVCNAME}.pid"
+output_log="/var/log/green-login.log"
+error_log="/var/log/green-login.log"
 
 depend() {
     need dbus elogind
@@ -232,6 +234,14 @@ If your system starts tty1 through `/etc/inittab`, disable that tty1 getty entry
 instead of using the `agetty.tty1` commands, and restore the entry when reverting.
 Keep tty2 enabled. Other OpenRC distributions can use the same service script,
 with their own dependency packages and PAM session configuration.
+
+If login fails, read `sudo tail -n 30 /var/log/green-login.log`. An `exec`
+error means the compiled session command or its interpreter is missing or cannot
+be executed. Replace the supplied `/home/green/.local/bin/green-session` path
+with your own session command in `config.h`, then rebuild and reinstall. A runtime
+directory error means PAM did not create a valid user runtime directory; check
+`rc-service elogind status` and the PAM session configuration. Do not create a
+world-writable runtime directory or bypass PAM authentication.
 
 See OpenRC's [service script guide](https://github.com/OpenRC/openrc/blob/master/service-script-guide.md)
 and [agetty guide](https://github.com/OpenRC/openrc/blob/master/agetty-guide.md).

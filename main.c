@@ -170,7 +170,10 @@ main(int argc, char **argv)
 				}
 				ui.interactive = true;
 			}
-			notice(&ui, status ? "Could not sign in. Please try again." : "",
+			notice(&ui,
+			       status > 0   ? "Session failed to start. Check the service log."
+			       : status < 0 ? "Authentication failed. Please try again."
+			                    : "",
 			       status != 0);
 		}
 		explicit_bzero(text, sizeof text);
