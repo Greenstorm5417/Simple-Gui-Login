@@ -108,5 +108,71 @@ Tab changes fields, Enter submits, Escape or Ctrl-U clears the selected field,
 and Backspace removes a character. After login, a waiting parent and PAM session
 worker remain until the desktop exits; the login screen then returns.
 
+## Arch Linux setup
+
+Install the build dependencies and clone the repository:
+
+```sh
+sudo pacman -Syu --needed base-devel git pam python-pillow
+git clone https://github.com/Greenstorm5417/Simple-Gui-Login.git
+cd Simple-Gui-Login
+```
+
+Edit `config.h`: set `.user` to your account name and replace `.session` with
+an installed compositor or your session script, using an absolute path. Keep
+`.tty = "/dev/tty1"` and `.pam_service = "login"` for the setup below. The
+configuration examples above show session commands. Then build and install:
+
+```sh
+make
+make check
+sudo make install
+```
+
+Arch includes PAM headers in `pam`; no separate development package is needed.
+The existing `/etc/pam.d/login` policy handles authentication and session setup.
+Check that `/dev/fb0` exists before enabling the service.
+
+Create `/etc/systemd/system/green-login.service`:
+
+```ini
+[Unit]
+Description=Simple GUI Login
+After=systemd-user-sessions.service getty@tty1.service plymouth-quit.service
+Conflicts=getty@tty1.service
+
+[Service]
+Type=exec
+ExecStart=/usr/local/bin/green-login --tty /dev/tty1
+Restart=on-failure
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target
+```
+
+If another display manager is enabled, disable its service first. Switch to tty2
+with Ctrl+Alt+F2 and log in there before running:
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl mask --now getty@tty1.service
+sudo systemctl enable --now green-login.service
+```
+
+Switch to tty1 with Ctrl+Alt+F1 to use the greeter. Keep tty2 available while
+testing. To restore the regular tty1 login, run these commands from tty2:
+
+```sh
+sudo systemctl disable --now green-login.service
+sudo systemctl unmask getty@tty1.service
+sudo systemctl start getty@tty1.service
+```
+
+View service errors with `journalctl -u green-login.service -b`.
+For package details, see Arch's [PAM](https://archlinux.org/packages/core/x86_64/pam/)
+and [Pillow](https://archlinux.org/packages/extra/x86_64/python-pillow/) packages,
+and the [systemd service manual](https://man.archlinux.org/man/systemd.service.5.en).
+
 The C code is MIT licensed. The bundled font has its own license in
 `assets/FONT-LICENSE.txt`.
