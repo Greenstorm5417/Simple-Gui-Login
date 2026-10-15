@@ -1,15 +1,43 @@
 #include "login.h"
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "config.h"
 
 volatile sig_atomic_t stopping, session_group;
+
+static int
+log_open(void)
+{
+	int fd = open(config.log_path, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC |
+	              O_NOFOLLOW | O_NONBLOCK, 0600);
+	if (fd < 0)
+		return -1;
+	struct stat info;
+	int result = fstat(fd, &info);
+	if (!result && (!S_ISREG(info.st_mode) || info.st_uid != 0 || info.st_nlink != 1)) {
+		errno = EPERM;
+		result = -1;
+	}
+	if (!result)
+		result = fchmod(fd, 0600);
+	if (!result)
+		result = dup2(fd, STDERR_FILENO) < 0 ? -1 : 0;
+	if (!result)
+		result = fcntl(STDERR_FILENO, F_SETFD, 0);
+	int saved = errno;
+	if (fd != STDERR_FILENO)
+		close(fd);
+	errno = saved;
+	return result;
+}
 
 static void
 stop(int signal)
@@ -117,19 +145,25 @@ main(int argc, char **argv)
 		else if (!strcmp(argv[i], "--preview") && i + 1 < argc)
 			image = argv[++i];
 		else if (!strcmp(argv[i], "--help")) {
-			puts("green-login [--tty /dev/tty1] [--preview FILE.ppm]");
+			puts("simple-gui-login [--tty /dev/tty1] [--preview FILE.ppm]");
 			return EXIT_SUCCESS;
 		} else {
-			fprintf(stderr, "green-login: unknown or incomplete option: %s\n", argv[i]);
+			fprintf(stderr, "simple-gui-login: unknown or incomplete option: %s\n", argv[i]);
 			return EXIT_FAILURE;
 		}
 	}
 	if (image)
 		return preview(&ui, image) ? EXIT_FAILURE : EXIT_SUCCESS;
 	if (geteuid()) {
-		fputs("green-login: run as root, without setuid bits\n", stderr);
+		fputs("simple-gui-login: run as root, without setuid bits\n", stderr);
 		return EXIT_FAILURE;
 	}
+	if (log_open() < 0) {
+		fprintf(stderr, "simple-gui-login: open log %s: %s\n", config.log_path, strerror(errno));
+		return EXIT_FAILURE;
+	}
+	fprintf(stderr, "simple-gui-login: starting pid %ld, tty %s, PAM %s, session %s\n",
+	        (long)getpid(), tty, config.pam_service, config.session[0]);
 	struct rlimit no_core = {0, 0};
 	if (setrlimit(RLIMIT_CORE, &no_core) < 0 || signals() < 0)
 		goto done;
@@ -184,7 +218,7 @@ main(int argc, char **argv)
 	}
 done:
 	if (result && !stopping)
-		fprintf(stderr, "green-login: %s\n", strerror(errno));
+		fprintf(stderr, "simple-gui-login: %s\n", strerror(errno));
 	explicit_bzero(ui.password, sizeof ui.password);
 	terminal_restore(&ui);
 	if (ui.fb >= 0)

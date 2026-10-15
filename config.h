@@ -6,6 +6,8 @@ const struct config config = {
     .title = "VOID LINUX",
     .pam_service = "login",
     .session_type = "wayland",
+    /* Root-owned log file, mode 0600. */
+    .log_path = "/var/log/simple-gui-login.log",
     /* Executable and arguments; terminate the list with NULL. */
     .session = {"/usr/bin/dbus-run-session", "/home/green/.local/bin/green-session", NULL},
 

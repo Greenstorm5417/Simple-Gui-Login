@@ -1,5 +1,5 @@
-#ifndef GREEN_LOGIN_H
-#define GREEN_LOGIN_H
+#ifndef SIMPLE_GUI_LOGIN_H
+#define SIMPLE_GUI_LOGIN_H
 
 #include <linux/fb.h>
 #include <signal.h>
@@ -12,7 +12,7 @@
 #define SECRET_SIZE 513
 
 struct config {
-	const char *user, *tty, *title, *pam_service, *session_type;
+	const char *user, *tty, *title, *pam_service, *session_type, *log_path;
 	char *session[16];
 	uint32_t background, text, muted, accent, card, border, field, field_border, error;
 };

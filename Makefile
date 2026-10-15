@@ -14,7 +14,7 @@ LDLIBS = $(shell $(PKG_CONFIG) --libs $(PKGS))
 OBJECTS = build/main.o build/platform.o build/draw.o build/session.o
 
 .PHONY: all install uninstall clean
-all: build/green-login
+all: build/simple-gui-login
 
 build:
 	mkdir -p $@
@@ -28,15 +28,15 @@ build/draw.o: build/logo.h
 build/%.o: %.c | build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-build/green-login: $(OBJECTS)
+build/simple-gui-login: $(OBJECTS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(LDLIBS)
 
-install: build/green-login
+install: build/simple-gui-login
 	install -d "$(DESTDIR)$(BINDIR)"
-	install -s -m 755 build/green-login "$(DESTDIR)$(BINDIR)/green-login"
+	install -s -m 755 build/simple-gui-login "$(DESTDIR)$(BINDIR)/simple-gui-login"
 
 uninstall:
-	rm -f "$(DESTDIR)$(BINDIR)/green-login"
+	rm -f "$(DESTDIR)$(BINDIR)/simple-gui-login"
 
 clean:
 	rm -rf build

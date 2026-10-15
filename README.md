@@ -11,7 +11,6 @@ The screen requires `/dev/fb0` with a true-color display of at least 480 × 380.
 
 ```sh
 make
-make check
 ```
 
 ## Configuration
@@ -25,6 +24,7 @@ into the executable; changing the file does not change an already running proces
 | `tty` | A numbered Linux VT, such as `/dev/tty1`. `--tty` overrides this for a single launch. Valid numbers are 1–63. |
 | `title` | The text above the username field. Use `""` to hide it. |
 | `pam_service` | The PAM policy name. `"login"` uses `/etc/pam.d/login`. |
+| `log_path` | Absolute path to the log file, normally `"/var/log/simple-gui-login.log"`. Created by the greeter as root with mode 0600. |
 | `session_type` | The session type passed to PAM as `XDG_SESSION_TYPE`, normally `"wayland"`. |
 | `session` | The executable's absolute path followed by its arguments and a final `NULL`. There are 16 slots, including the final `NULL`. |
 
@@ -86,7 +86,7 @@ original size. The login screen does not read the image file at runtime.
 Preview the compiled theme without opening a tty or authenticating:
 
 ```sh
-build/green-login --preview preview.ppm
+build/simple-gui-login --preview preview.ppm
 ```
 
 ## Install and run
@@ -95,7 +95,7 @@ build/green-login --preview preview.ppm
 sudo make install
 ```
 
-The default install path is `/usr/local/bin/green-login`. Override `PREFIX` to
+The default install path is `/usr/local/bin/simple-gui-login`. Override `PREFIX` to
 change it, or use `DESTDIR` for a staged installation. Run `make clean` to remove
 build output.
 
@@ -125,7 +125,6 @@ configuration examples above show session commands. Then build and install:
 
 ```sh
 make
-make check
 sudo make install
 ```
 
@@ -133,7 +132,7 @@ Arch includes PAM headers in `pam`; no separate development package is needed.
 The existing `/etc/pam.d/login` policy handles authentication and session setup.
 Check that `/dev/fb0` exists before enabling the service.
 
-Create `/etc/systemd/system/green-login.service`:
+Create `/etc/systemd/system/simple-gui-login.service`:
 
 ```ini
 [Unit]
@@ -143,7 +142,7 @@ Conflicts=getty@tty1.service
 
 [Service]
 Type=exec
-ExecStart=/usr/local/bin/green-login --tty /dev/tty1
+ExecStart=/usr/local/bin/simple-gui-login --tty /dev/tty1
 Restart=on-failure
 RestartSec=1
 
@@ -157,19 +156,29 @@ with Ctrl+Alt+F2 and log in there before running:
 ```sh
 sudo systemctl daemon-reload
 sudo systemctl mask --now getty@tty1.service
-sudo systemctl enable --now green-login.service
+sudo systemctl enable --now simple-gui-login.service
 ```
 
 Switch to tty1 with Ctrl+Alt+F1 to use the greeter. Keep tty2 available while
 testing. To restore the regular tty1 login, run these commands from tty2:
 
 ```sh
-sudo systemctl disable --now green-login.service
+sudo systemctl disable --now simple-gui-login.service
 sudo systemctl unmask getty@tty1.service
 sudo systemctl start getty@tty1.service
 ```
 
-View service errors with `journalctl -u green-login.service -b`.
+The greeter writes startup, authentication, and session errors directly to
+`/var/log/simple-gui-login.log`, without a logging daemon. Desktop stderr is
+written there too. Passwords and PAM answers are never logged. Read it with:
+
+```sh
+sudo tail -n 50 /var/log/simple-gui-login.log
+```
+
+If the file is missing, confirm you rebuilt and installed the current executable.
+Log-opening errors go to the service stderr; on Arch, check
+`journalctl -u simple-gui-login.service -b`.
 For package details, see Arch's [PAM](https://archlinux.org/packages/core/x86_64/pam/)
 and [Pillow](https://archlinux.org/packages/extra/x86_64/python-pillow/) packages,
 and the [systemd service manual](https://man.archlinux.org/man/systemd.service.5.en).
@@ -182,23 +191,23 @@ These instructions assume Artix is already running OpenRC. Install dependencies:
 sudo pacman -Syu --needed base-devel git pam python-pillow dbus-openrc elogind-openrc
 ```
 
-Clone the repository and edit `config.h` as described above, then run `make`,
-`make check`, and `sudo make install`. Keep the `login` PAM policy and make sure
+Clone the repository and edit `config.h` as described above, then run `make` and
+`sudo make install`. Keep the `login` PAM policy and make sure
 it includes `pam_elogind.so` through Artix's existing session configuration;
 the greeter requires `/run/user/<uid>` to be created for the logged-in user.
 Check that `/dev/fb0` exists.
 
-Create `/etc/init.d/green-login`:
+Create `/etc/init.d/simple-gui-login`:
 
 ```sh
 #!/sbin/openrc-run
 
-command="/usr/local/bin/green-login"
+command="/usr/local/bin/simple-gui-login"
 command_args="--tty /dev/tty1"
 command_background=true
 pidfile="/run/${RC_SVCNAME}.pid"
-output_log="/var/log/green-login.log"
-error_log="/var/log/green-login.log"
+output_log="/var/log/simple-gui-login.log"
+error_log="/var/log/simple-gui-login.log"
 
 depend() {
     need dbus elogind
@@ -212,20 +221,20 @@ and log in there. The commands below assume the normal tty1 login is the
 its actual runlevel if different.
 
 ```sh
-sudo chmod 755 /etc/init.d/green-login
+sudo chmod 755 /etc/init.d/simple-gui-login
 sudo rc-update add dbus default
 sudo rc-update add elogind default
 sudo rc-update del agetty.tty1 default
 sudo rc-service agetty.tty1 stop
-sudo rc-update add green-login default
-sudo rc-service green-login start
+sudo rc-update add simple-gui-login default
+sudo rc-service simple-gui-login start
 ```
 
 Switch to tty1 with Ctrl+Alt+F1. To restore the normal login, run from tty2:
 
 ```sh
-sudo rc-service green-login stop
-sudo rc-update del green-login default
+sudo rc-service simple-gui-login stop
+sudo rc-update del simple-gui-login default
 sudo rc-update add agetty.tty1 default
 sudo rc-service agetty.tty1 start
 ```
@@ -235,7 +244,7 @@ instead of using the `agetty.tty1` commands, and restore the entry when revertin
 Keep tty2 enabled. Other OpenRC distributions can use the same service script,
 with their own dependency packages and PAM session configuration.
 
-If login fails, read `sudo tail -n 30 /var/log/green-login.log`. An `exec`
+If login fails, read `sudo tail -n 30 /var/log/simple-gui-login.log`. An `exec`
 error means the compiled session command or its interpreter is missing or cannot
 be executed. Replace the supplied `/home/green/.local/bin/green-session` path
 with your own session command in `config.h`, then rebuild and reinstall. A runtime
