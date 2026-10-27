@@ -7,7 +7,7 @@ PYTHON = python3
 
 IMAGE = assets/void-logo.png
 PKGS = pam
-CFLAGS = -O2 -std=c11 -Wall -Wextra -pedantic -fstack-protector-strong -MMD -MP $(shell $(PKG_CONFIG) --cflags $(PKGS))
+CFLAGS = -O2 -std=c23 -Wall -Wextra -pedantic -fstack-protector-strong -MMD -MP $(shell $(PKG_CONFIG) --cflags $(PKGS))
 CPPFLAGS += -D_GNU_SOURCE -D_FORTIFY_SOURCE=3 -I. -Ibuild
 LDFLAGS = -Wl,-z,relro,-z,now
 LDLIBS = $(shell $(PKG_CONFIG) --libs $(PKGS))
