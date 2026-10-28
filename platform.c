@@ -8,6 +8,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -109,8 +110,8 @@ void terminal_restore(struct ui* ui) {
         return;
     }
 
-    char path[32];
-    snprintf(path, sizeof path, "/dev/tty%d", ui->vt);
+    char path[TTY_NAME_MAX];
+    snprintf(path, sizeof(path), "/dev/tty%d", ui->vt);
 
     int fd = open(path, O_RDWR | O_NOCTTY | O_CLOEXEC);
     if (fd >= 0) {
@@ -196,8 +197,8 @@ int terminal_detach(struct ui* ui) {
 }
 
 int terminal_reclaim(struct ui* ui) {
-    char path[32];
-    snprintf(path, sizeof path, "/dev/tty%d", ui->vt);
+    char path[TTY_NAME_MAX];
+    snprintf(path, sizeof(path), "/dev/tty%d", ui->vt);
 
     int fd = open(path, O_RDWR | O_NOCTTY | O_CLOEXEC);
     if (fd < 0) {
@@ -239,7 +240,6 @@ static int byte(int fd, int timeout) {
             if (terminal_events() < 0) {
                 return -1;
             }
-
             continue;
         }
 
@@ -298,7 +298,7 @@ int read_key(int fd, char text[5]) {
     }
 
     if (first >= 32 && first <= 126) {
-        text[0] = (char)first;
+        text[0] = (char) first;
         return 1;
     }
 
@@ -306,10 +306,10 @@ int read_key(int fd, char text[5]) {
         return KEY_IGNORE;
     }
 
-    unsigned len = first < 0xe0 ? 2 : first < 0xf0 ? 3 : 4;
+    int len = first < 0xe0 ? 2 : first < 0xf0 ? 3 : 4;
     text[0] = (char) first;
 
-    for (unsigned i = 1; i < len; i++) {
+    for (int i = 1; i < len; i++) {
         int ch = byte(fd, 50);
         if (ch < 0x80 || ch > 0xbf) {
             return KEY_IGNORE;
@@ -323,7 +323,7 @@ int read_key(int fd, char text[5]) {
         return KEY_IGNORE;
     }
 
-    return (int) len;
+    return len;
 }
 
 int framebuffer_open(struct ui* ui) {
@@ -346,8 +346,8 @@ int framebuffer_open(struct ui* ui) {
             !valid_channel(v->green, v->bits_per_pixel, false) ||
             !valid_channel(v->blue, v->bits_per_pixel, false) ||
             !valid_channel(v->transp, v->bits_per_pixel, true) ||
-            ((uint64_t)v->yoffset + v->yres) * f->line_length > f->smem_len ||
-            ((uint64_t)v->xoffset + v->xres) * (v->bits_per_pixel / 8) > f->line_length) {
+            ((uint64_t) v->yoffset + v->yres) * f->line_length > f->smem_len ||
+            ((uint64_t) v->xoffset + v->xres) * (v->bits_per_pixel / 8) > f->line_length) {
         errno = EINVAL;
         goto fail;
     }

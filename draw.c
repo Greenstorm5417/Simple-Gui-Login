@@ -28,14 +28,14 @@ static void pixel(struct canvas *c, int x, int y, uint32_t color, unsigned alpha
     uint32_t old = c->pixels[x];
 
     uint32_t mixed = 0;
-    for (unsigned shift = 0; shift <= 16; shift += 8) {
+    for (uint32_t shift = 0; shift <= 16; shift += 8) {
         mixed |= ((((color >> shift) & 255) * alpha + ((old >> shift) & 255) * (255 - alpha)) / 255) << shift;
     }
 
     c->pixels[x] = mixed;
 }
 
-static void rect(struct canvas *c, int x, int y, int w, int h, int r, uint32_t color) {
+static void rect(struct canvas* c, int x, int y, int w, int h, int r, uint32_t color) {
     int py = c->y;
     if (py < y || py >= y + h) {
         return;
@@ -100,25 +100,29 @@ static void text(struct canvas* c, const char* s, int x, int baseline, unsigned 
 	}
 }
 
-static void centered(struct canvas *c, const char *s, int baseline, unsigned size, uint32_t color) {
+static void centered(struct canvas* c, const char* s, int baseline, unsigned size, uint32_t color) {
     float width = 0;
     for (const char *p = s; *p;) {
         width += glyph(next_char(&p), size)->advance;
     }
+
     text(c, s, rounded((WIDTH - width) / 2), baseline, size, color, WIDTH - 32);
 }
 
-static void field(struct canvas *c, int y, const char *label, const char *value, bool focus) {
+static void field(struct canvas* c, int y, const char* label, const char *value, bool focus) {
     text(c, label, 58, y, 12, config.muted, 366);
+
     rect(c, 56, y + 10, 368, 43, 7, focus ? config.accent : config.field_border);
     rect(c, 57, y + 11, 366, 41, 6, config.field);
+
     text(c, value, 70, y + 39, 17, config.text, 338);
+
     if (focus && !*value) {
         rect(c, 70, y + 20, 1, 20, 0, config.accent);
     }
 }
 
-static void scanline(struct canvas *c, const struct ui *ui, bool caps) {
+static void scanline(struct canvas* c, const struct ui* ui, bool caps) {
     for (unsigned x = 0; x < WIDTH; x++) {
         c->pixels[x] = config.background;
     }
@@ -138,8 +142,8 @@ static void scanline(struct canvas *c, const struct ui *ui, bool caps) {
 
     char masked[28 * 3 + 1] = {0};
     unsigned count = 0;
-    for (const char *p = ui->password; *p && count < 28; count++) {
-        (void) next_char(&p);
+    for (const char* p = ui->password; *p && count < 28; count++) {
+        next_char(&p);
         memcpy(masked + count * 3, "\xe2\x80\xa2", 3);
     }
 
@@ -253,7 +257,7 @@ int preview(struct ui* ui, const char* path) {
             row[x * 3 + 2] = (unsigned char)color;
         }
 
-        failed = fwrite(row, 1, sizeof row, out) != sizeof row;
+        failed = fwrite(row, 1, sizeof(row), out) != sizeof(row);
     }
 
     if (fclose(out)) {

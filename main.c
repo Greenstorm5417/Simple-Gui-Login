@@ -110,7 +110,7 @@ int answer(struct ui* ui, const char* prompt, bool secret, char out[SECRET_SIZE]
     }
 
     explicit_bzero(out, SECRET_SIZE);
-    explicit_bzero(ui->password, sizeof ui->password);
+    explicit_bzero(ui->password, sizeof(ui->password));
 
     notice(ui, prompt, false);
 
@@ -127,7 +127,7 @@ int answer(struct ui* ui, const char* prompt, bool secret, char out[SECRET_SIZE]
         }
 
         if (key == KEY_ENTER) {
-            explicit_bzero(ui->password, sizeof ui->password);
+            explicit_bzero(ui->password, sizeof(ui->password));
             return 0;
         }
 
@@ -144,12 +144,12 @@ int answer(struct ui* ui, const char* prompt, bool secret, char out[SECRET_SIZE]
         }
 
         if (secret) {
-            snprintf(ui->password, sizeof ui->password, "%s", out);
+            snprintf(ui->password, sizeof(ui->password), "%s", out);
         } else {
-            snprintf(ui->status, sizeof ui->status, "%.160s", out);
+            snprintf(ui->status, sizeof(ui->status), "%.160s", out);
         }
 
-        explicit_bzero(text, sizeof text);
+        explicit_bzero(text, sizeof(text));
 
         if (draw(ui) < 0) {
             break;
@@ -157,12 +157,12 @@ int answer(struct ui* ui, const char* prompt, bool secret, char out[SECRET_SIZE]
     }
 
     explicit_bzero(out, SECRET_SIZE);
-    explicit_bzero(ui->password, sizeof ui->password);
+    explicit_bzero(ui->password, sizeof(ui->password));
     return -1;
 }
 
 void notice(struct ui* ui, const char* message, bool error) {
-    snprintf(ui->status, sizeof ui->status, "%s", message);
+    snprintf(ui->status, sizeof(ui->status), "%s", message);
 
     for (char *p = ui->status; *p; p++) {
         if (*p == '\r' || *p == '\n') {
@@ -187,7 +187,7 @@ int main(int argc, char* argv[]) {
     const char* tty = config.tty;
     const char* image = NULL;
 
-    snprintf(ui.user, sizeof ui.user, "%s", config.user);
+    snprintf(ui.user, sizeof(ui.user), "%s", config.user);
 
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--tty") && i + 1 < argc) {
@@ -198,8 +198,7 @@ int main(int argc, char* argv[]) {
             puts("simple-gui-login [--tty /dev/tty1] [--preview FILE.ppm]");
             return EXIT_SUCCESS;
         } else {
-            fprintf(stderr, "simple-gui-login: unknown or incomplete option: %s\n", argv[i]);
-            return EXIT_FAILURE;
+            errx(EXIT_FAILURE, "unknown or incomplete option: %s", argv[i]);
         }
     }
 
@@ -215,8 +214,7 @@ int main(int argc, char* argv[]) {
         err(EXIT_FAILURE, "failed to open log %s", config.log_path);
     }
 
-    fprintf(stderr, "simple-gui-login: starting pid %d, tty %s, PAM %s, session %s\n",
-            getpid(), tty, config.pam_service, config.session[0]);
+    warnx("starting pid %d, tty %s, PAM %s, session %s", getpid(), tty, config.pam_service, config.session[0]);
 
     if (init_signals() < 0) {
         err(EXIT_FAILURE, "failed to initialize signals");
@@ -249,13 +247,12 @@ int main(int argc, char* argv[]) {
             if (errno == EINTR) {
                 continue;
             }
-
             ret = EXIT_FAILURE;
             break;
         }
 
         char* value = ui.focus ? ui.password : ui.user;
-        size_t size = ui.focus ? sizeof ui.password : sizeof ui.user;
+        size_t size = ui.focus ? sizeof(ui.password) : sizeof(ui.user);
 
         if (key == KEY_TAB) {
             ui.focus ^= 1;
@@ -263,14 +260,14 @@ int main(int argc, char* argv[]) {
             explicit_bzero(value, size);
         } else if (key == KEY_BACKSPACE) {
             backspace(value);
-        } else if (key > 0 && (ui.focus || (unsigned char)text[0] > 32)) {
+        } else if (key > 0 && (ui.focus || (unsigned char) text[0] > 32)) {
             append(value, size, text);
         } else if (key == KEY_ENTER) {
             notice(&ui, "", false);
 
             int status = login_session(&ui);
 
-            explicit_bzero(ui.password, sizeof ui.password);
+            explicit_bzero(ui.password, sizeof(ui.password));
 
             if (stopping) {
                 break;
@@ -285,13 +282,10 @@ int main(int argc, char* argv[]) {
                 ui.interactive = true;
             }
 
-            notice(&ui, status > 0  ? "Session failed to start. Check the service log."
-                    : status < 0 ? "Authentication failed. Please try again."
-                    : "",
-                    status != 0);
+            notice(&ui, status > 0  ? "Session failed to start. Check the service log." : status < 0 ? "Authentication failed. Please try again." : "", status != 0);
         }
 
-        explicit_bzero(text, sizeof text);
+        explicit_bzero(text, sizeof(text));
 
         if (draw(&ui) < 0) {
             ret = EXIT_FAILURE;
@@ -300,11 +294,11 @@ int main(int argc, char* argv[]) {
     }
 
     if (ret && !stopping) {
-        fprintf(stderr, "simple-gui-login: %s\n", strerror(errno));
+        warn("stopping due to error");
     }
 
 end:
-    explicit_bzero(ui.password, sizeof ui.password);
+    explicit_bzero(ui.password, sizeof(ui.password));
 
     terminal_restore(&ui);
 
